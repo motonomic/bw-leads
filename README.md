@@ -14,7 +14,7 @@ Everything runs in the visitor's browser. Report files are never uploaded or sto
 ## Publish on GitHub Pages
 
 1. Create a new repository on GitHub (public is fine, the repository holds only code).
-2. Upload all files from this folder to the repository root, including the `vendor` folder and `.nojekyll`.
+2. Upload `index.html` (and, if you like, this README) to the repository root. `index.html` is a single self-contained file, so there is nothing else to upload.
 3. Open **Settings → Pages**. Under **Build and deployment**, set **Source** to *Deploy from a branch*, choose branch `main` and folder `/ (root)`, then **Save**.
 4. After a minute the site is live at `https://<your-username>.github.io/<repository-name>/`.
 
@@ -22,7 +22,7 @@ To update the page later, replace `index.html` in the repository.
 
 ## Notes
 
-- `vendor/` holds the two libraries the page needs (SheetJS 0.18.5 to read reports, ExcelJS 4.4.0 to write the workbook), so the page works without a CDN.
+- `index.html` has the two libraries it needs built in (SheetJS 0.18.5 to read reports, ExcelJS 4.4.0 to write the workbook), so it works without a CDN and without any other file.
 - The page loads IBM Plex fonts from Google Fonts and falls back to system fonts if they are unavailable.
 - "Next follow-up date passed" is judged against each report's "data as of" date, which the page takes from the file name and lets you change.
 - Open = Enquiry or Quotation stage. Booking and Lost enquiries are left out of the open list.
