@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Enquiry Report Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one working column. Upload reports, review the summary, preview each sheet, download the workbook.
+   Palette: ink blue matching the Excel headers, cool grey neutrals, red only for follow-up flags. */
+:root{
+  --bg:#f5f7fa; --surface:#ffffff; --fg:#17202b; --muted:#5b6776; --line:#d9dfe7; --soft:#eaf0f7;
+  --accent:#1f4e78; --accent-fg:#ffffff; --accent-soft:#dbe8f5; --flag:#b42318; --flag-bg:#fdeceb; --ok:#1a7f4b;
+  --font:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Arial,sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f151c; --surface:#171f29; --fg:#e6ebf1; --muted:#9aa7b7; --line:#2a3544; --soft:#1d2733;
+  --accent:#6fa8dc; --accent-fg:#0c1722; --accent-soft:#1f3347; --flag:#ff8a80; --flag-bg:#3a1e1d; --ok:#5fcf93; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f151c; --surface:#171f29; --fg:#e6ebf1; --muted:#9aa7b7; --line:#2a3544; --soft:#1d2733;
+  --accent:#6fa8dc; --accent-fg:#0c1722; --accent-soft:#1f3347; --flag:#ff8a80; --flag-bg:#3a1e1d; --ok:#5fcf93; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--font);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+h1{font-size:26px;line-height:1.2;margin:0 0 6px;font-weight:600;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:15px;margin:0 0 10px;font-weight:600}
+p{margin:0}
+.lede{color:var(--muted);max-width:68ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:18px}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:26px 16px;text-align:center;background:var(--soft);transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop strong{display:block;font-size:15px;margin-bottom:4px}
+.drop span{color:var(--muted);display:block;margin-bottom:14px;max-width:60ch;margin-inline:auto}
+button,.btn{font:inherit;cursor:pointer}
+.btn{background:var(--accent);color:var(--accent-fg);border:0;border-radius:6px;padding:9px 16px;font-weight:500}
+.btn:hover{filter:brightness(1.08)} .btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.files{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.file{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.file .nm{flex:1 1 260px;min-width:0;overflow-wrap:anywhere;font-weight:500}
+.file .meta{color:var(--muted);font-size:13px}
+.file label{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.file input[type=date]{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:4px 6px}
+.file .x{background:none;border:0;color:var(--muted);padding:4px 8px;border-radius:4px}
+.file .x:hover{color:var(--flag)}
+.file.err{border-color:var(--flag);background:var(--flag-bg)}
+.file.err .meta{color:var(--flag)}
+.note{color:var(--muted);font-size:13px;margin-top:12px}
+.bar{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;justify-content:space-between}
+.bar .status{color:var(--muted);font-size:13px;min-height:1.4em}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{background:var(--accent);color:var(--accent-fg);font-weight:600;text-align:center;padding:8px 10px;white-space:nowrap;position:sticky;top:0}
+td{padding:7px 10px;border-top:1px solid var(--line);vertical-align:top;white-space:nowrap}
+td.wrap{white-space:normal;min-width:230px}
+td.c{text-align:center} td.n{text-align:center;font-variant-numeric:tabular-nums}
+td.mono{font-family:var(--mono);font-size:12px;white-space:nowrap}
+td.mod{position:relative;white-space:nowrap;min-width:150px}
+td.mod .bar{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);opacity:.55;border-radius:0 2px 0 0}
+tr.tot td{font-weight:600;background:var(--soft)}
+.pill{display:inline-block;border-radius:999px;padding:1px 8px;font-size:12px;background:var(--flag-bg);color:var(--flag);white-space:nowrap}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tab{background:transparent;border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:6px 12px}
+.tab[aria-selected=true]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.tab small{opacity:.75;margin-left:4px}
+.tools{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-bottom:10px;color:var(--muted);font-size:13px}
+.tools select{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:4px 6px}
+.preview{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:6px}
+.preview .tablebox{border:0;border-radius:0}
+.empty{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px 28px}
+.empty h3{font-size:13px;margin:0 0 6px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em}
+.empty ul{margin:0;padding-left:18px;color:var(--muted)}
+.empty li{margin:2px 0}
+.cols{font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.8}
+[hidden]{display:none!important}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Enquiry Report Builder</h1>
+    <p class="lede">Upload the Enquiry Detailed Report from HMSI. You get one Excel file with the open enquiries for each sales executive and the invoiced customers, each with follow-up counts and dates.</p>
+  </header>
+
+  <section class="panel" aria-labelledby="h-up">
+    <h2 id="h-up">Reports</h2>
+    <div class="drop" id="drop">
+      <strong>Drop report files here</strong>
+      <span>Excel (.xlsx, .xls) or CSV. Add more than one report, such as October and November, and they are merged by enquiry number.</span>
+      <button class="btn" id="pick" type="button">Choose files</button>
+      <input id="file" type="file" accept=".xlsx,.xls,.csv,.tsv,.txt" multiple hidden>
+    </div>
+    <div class="files" id="files" aria-live="polite"></div>
+    <p class="note">Files are read in this browser tab and are not uploaded anywhere. If an enquiry appears in two reports, the one from the later &ldquo;data as of&rdquo; date is used.</p>
+  </section>
+
+  <section class="panel" id="empty" aria-labelledby="h-get">
+    <h2 id="h-get">What the Excel file contains</h2>
+    <div class="empty">
+      <div>
+        <h3>Sheets</h3>
+        <ul>
+          <li><b>Summary</b>: open enquiries, average follow-ups, no follow-up, overdue and invoiced for each executive</li>
+          <li><b>Model Wise</b>: enquiries for each model by stage, share, booked or invoiced %, and executive</li>
+          <li><b>Open</b>, one sheet per executive: enquiries at Enquiry or Quotation stage, oldest first</li>
+          <li><b>Invoiced</b>: invoiced customers in the same format</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Columns</h3>
+        <p class="cols">Enquiry Number &middot; Enquiry Date &middot; Customer Name &middot; Mobile No. &middot; Model &middot; Enquiry Source &middot; Classification &middot; Current Status &middot; Times Followed Up &middot; Last Follow-up Date &middot; Last Follow-up Remark &middot; Next Follow-up Date &middot; Flag &middot; Data As Of</p>
+      </div>
+    </div>
+  </section>
+
+  <div id="results" hidden>
+    <section class="panel" aria-labelledby="h-sum" style="margin-bottom:22px">
+      <div class="bar" style="margin-bottom:14px">
+        <h2 id="h-sum" style="margin:0">Summary</h2>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+          <span class="status" id="status" role="status"></span>
+          <button class="btn" id="dl" type="button">Download Excel</button>
+        </div>
+      </div>
+      <div class="tablebox"><table id="sum"></table></div>
+      <p class="note" id="sumnote"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="h-mod" style="margin-bottom:22px">
+      <h2 id="h-mod">By model</h2>
+      <div class="tablebox"><table id="mod"></table></div>
+      <p class="note">Models are counted as named in the report, all stages included. Booked or invoiced % = (Booking + Invoiced) / Enquiries. Executive columns count all stages.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="h-prev">
+      <h2 id="h-prev">Preview</h2>
+      <div class="tabs" id="tabs" role="tablist"></div>
+      <div class="tools" id="tools">
+        <label for="flt">Flag</label>
+        <select id="flt">
+          <option value="">All</option>
+          <option>No follow-up recorded</option>
+          <option>Next follow-up date passed</option>
+          <option>No next follow-up date</option>
+        </select>
+        <span id="cnt"></span>
+      </div>
+      <div class="preview"><div class="tablebox"><table id="prev"></table></div></div>
+    </section>
+  </div>
+</div>
+
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/exceljs.min.js"></script>
+<script>
+/* Core logic: parse HMSI "Enquiry Detailed Report" rows and build the open / invoiced lists. */
+const Core = (function () {
+  const MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+  const DAY = 86400000;
+
+  const txt = (v) => (v === null || v === undefined ? '' : String(v).trim());
+
+  // Excel serial number or text date -> UTC-midnight milliseconds (or null)
+  function toDay(v) {
+    if (v === null || v === undefined || v === '') return null;
+    if (v instanceof Date) return Date.UTC(v.getFullYear(), v.getMonth(), v.getDate());
+    if (typeof v === 'number') {
+      if (v < 20000 || v > 80000) return null;
+      return Math.floor(v) * DAY - 25569 * DAY;
+    }
+    const s = String(v).trim();
+    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+    m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
+    if (m) {
+      const y = +m[3] < 100 ? 2000 + +m[3] : +m[3];
+      return Date.UTC(y, +m[2] - 1, +m[1]);
+    }
+    m = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[a-z]*[-\s,]*(\d{2,4})/);
+    if (m && MON[m[2].toLowerCase()] !== undefined) {
+      const y = +m[3] < 100 ? 2000 + +m[3] : +m[3];
+      return Date.UTC(y, MON[m[2].toLowerCase()], +m[1]);
+    }
+    return null;
+  }
+
+  const normSource = (s) => (/^always\s*on/i.test(s) ? 'Always on-BW' : s);
+
+  const titleCase = (s) =>
+    s.toLowerCase().replace(/(^|\s)([a-z])/g, (m, a, b) => a + b.toUpperCase());
+
+  // aoa: array of rows (arrays). Returns { records, hasMobile } or throws Error with a readable message.
+  function parseReport(aoa, asOf) {
+    let h = -1;
+    for (let i = 0; i < Math.min(aoa.length, 40); i++) {
+      const cells = (aoa[i] || []).map(txt);
+      if (cells.includes('Enquiry Number') && cells.includes('Dealer Sales Executive Name')) { h = i; break; }
+    }
+    if (h < 0) throw new Error('This does not look like an Enquiry Detailed Report: the "Enquiry Number" and "Dealer Sales Executive Name" columns were not found.');
+    const col = {};
+    (aoa[h] || []).forEach((c, i) => { const t = txt(c); if (t && col[t] === undefined) col[t] = i; });
+    const need = ['Enquiry Number', 'Dealer Sales Executive Name', 'Enquiry Sales Stage', 'Current follow up date'];
+    const miss = need.filter((n) => col[n] === undefined);
+    if (miss.length) throw new Error('Missing column(s): ' + miss.join(', ') + '.');
+    const g = (row, name) => (col[name] === undefined ? null : row[col[name]]);
+
+    const records = [];
+    let cur = null;
+    let last = { created: null, model: '', variant: '', exec: '' };
+    const finish = () => { if (cur) { records.push(cur); cur = null; } };
+
+    for (let i = h + 1; i < aoa.length; i++) {
+      const row = aoa[i] || [];
+      const enq = txt(g(row, 'Enquiry Number'));
+      if (/\btotal$/i.test(enq)) { finish(); continue; }
+      const created = toDay(g(row, 'Enquiry Created Date'));
+      if (created !== null) last.created = created;
+      const model = txt(g(row, 'Model Name')); if (model) last.model = model;
+      const variant = txt(g(row, 'Model Variant')); if (variant) last.variant = variant;
+      const ex = txt(g(row, 'Dealer Sales Executive Name')); if (ex) last.exec = ex;
+      if (enq && (!cur || cur.enq !== enq)) {
+        finish();
+        cur = {
+          enq, exec: last.exec, created: last.created,
+          model: last.model ? (last.variant ? last.model + ' – ' + last.variant : last.model) : '',
+          modelName: last.model,
+          name: '', mob: '', cls: '', src: '', stage: '', fu: [], asOf,
+        };
+      }
+      if (!cur) continue;
+      if (!cur.name) {
+        const nm = (txt(g(row, 'Customer First Name')) + ' ' + txt(g(row, 'Customer Last Name'))).trim();
+        if (nm) cur.name = nm;
+      }
+      if (!cur.mob) { const m = txt(g(row, 'Mobile No.')); if (m) cur.mob = m.replace(/\.0$/, ''); }
+      if (!cur.cls) cur.cls = txt(g(row, 'Enquiry Classification'));
+      if (!cur.src) cur.src = normSource(txt(g(row, 'Enquiry Source')));
+      if (!cur.stage) cur.stage = txt(g(row, 'Enquiry Sales Stage'));
+      const cd = toDay(g(row, 'Current follow up date'));
+      if (cd !== null) {
+        cur.fu.push({ cur: cd, nxt: toDay(g(row, 'Next follow up date')), rem: txt(g(row, 'Follow up Remark')) });
+      }
+    }
+    finish();
+
+    const out = records.map((r) => {
+      let lastDate = null, rem = '', nxt = null;
+      if (r.fu.length) {
+        let best = r.fu[0];
+        for (const f of r.fu) if (f.cur >= best.cur) best = f; // latest date, later row wins a tie
+        lastDate = best.cur; rem = best.rem; nxt = best.nxt;
+      }
+      const { fu, ...rest } = r;
+      return { ...rest, n: fu.length, last: lastDate, rem, nxt };
+    });
+    return { records: out, hasMobile: col['Mobile No.'] !== undefined };
+  }
+
+  // files: [{name, asOf (ms), records, hasMobile}]
+  function build(files) {
+    const byEnq = new Map();
+    const sorted = files.slice().sort((a, b) => a.asOf - b.asOf);
+    for (const f of sorted) for (const r of f.records) byEnq.set(r.enq, r); // newer file wins
+    const all = [...byEnq.values()].filter((r) => r.exec);
+
+    const total = new Map();
+    for (const r of all) total.set(r.exec, (total.get(r.exec) || 0) + 1);
+    const execs = [...total.keys()].sort((a, b) => total.get(b) - total.get(a) || a.localeCompare(b));
+
+    const flagOf = (r) => {
+      if (/^invoiced$/i.test(r.stage)) return '';
+      if (r.n === 0) return 'No follow-up recorded';
+      if (r.nxt === null) return 'No next follow-up date';
+      if (r.nxt < r.asOf) return 'Next follow-up date passed';
+      return '';
+    };
+    for (const r of all) r.flag = flagOf(r);
+
+    const isOpen = (r) => /^(enquiry|quotation)$/i.test(r.stage);
+    const isInv = (r) => /^invoiced$/i.test(r.stage);
+    const bySort = (a, b) => (a.created ?? 0) - (b.created ?? 0) || a.enq.localeCompare(b.enq);
+
+    const used = new Set(['summary', 'invoiced']);
+    const sheetName = (ex) => {
+      let base = ('Open - ' + titleCase(ex)).replace(/[\\/?*[\]:']/g, '').slice(0, 31);
+      let n = base, k = 2;
+      while (used.has(n.toLowerCase())) { n = base.slice(0, 28) + ' ' + k++; }
+      used.add(n.toLowerCase());
+      return n;
+    };
+    const perExec = execs.map((ex) => ({
+      exec: ex,
+      sheet: sheetName(ex),
+      open: all.filter((r) => r.exec === ex && isOpen(r)).sort(bySort),
+    }));
+    const invoiced = all.filter(isInv).sort((a, b) => execs.indexOf(a.exec) - execs.indexOf(b.exec) || bySort(a, b));
+
+    const stats = perExec.map((p) => {
+      const n = p.open.length;
+      const sum = p.open.reduce((s, r) => s + r.n, 0);
+      return {
+        exec: p.exec, sheet: p.sheet, open: n,
+        avg: n ? sum / n : 0,
+        none: p.open.filter((r) => r.n === 0).length,
+        passed: p.open.filter((r) => r.flag === 'Next follow-up date passed').length,
+        invoiced: invoiced.filter((r) => r.exec === p.exec).length,
+      };
+    });
+    const totals = {
+      open: stats.reduce((s, x) => s + x.open, 0),
+      none: stats.reduce((s, x) => s + x.none, 0),
+      passed: stats.reduce((s, x) => s + x.passed, 0),
+      invoiced: invoiced.length,
+    };
+    totals.avg = totals.open ? stats.reduce((s, x) => s + x.avg * x.open, 0) / totals.open : 0;
+    const kind = (s) => (/^(enquiry|quotation)$/i.test(s) ? 'open' : /^booking$/i.test(s) ? 'booking' : /^invoiced$/i.test(s) ? 'invoiced' : /lost/i.test(s) ? 'lost' : 'other');
+    const mm = new Map();
+    for (const r of all) {
+      const key = (r.modelName || '').replace(/\.+$/, '').trim() || 'Unknown';
+      if (!mm.has(key)) mm.set(key, { model: key, total: 0, open: 0, booking: 0, invoiced: 0, lost: 0, other: 0, byExec: Object.fromEntries(execs.map((e) => [e, 0])) });
+      const m = mm.get(key);
+      m.total++; m[kind(r.stage)]++; m.byExec[r.exec]++;
+    }
+    const models = [...mm.values()].sort((a, b) => b.total - a.total || a.model.localeCompare(b.model));
+    const booking = all.filter((r) => /^booking$/i.test(r.stage)).length;
+    const lost = all.filter((r) => /lost/i.test(r.stage)).length;
+    return { all, perExec, invoiced, stats, totals, models, execs, booking, lost, files: sorted.map((f) => ({ name: f.name, asOf: f.asOf, count: f.records.length })), anyNoMobile: files.some((f) => !f.hasMobile) };
+  }
+
+  const fmtDay = (ms) => {
+    if (ms === null || ms === undefined) return '';
+    const d = new Date(ms);
+    return String(d.getUTCDate()).padStart(2, '0') + '-' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()] + '-' + d.getUTCFullYear();
+  };
+
+  const COLS = [
+    ['#', null, 5], ['Executive', 'exec', 24], ['Enquiry Number', 'enq', 30], ['Enquiry Date', 'created', 13],
+    ['Customer Name', 'name', 24], ['Mobile No.', 'mob', 13], ['Model', 'model', 38], ['Enquiry Source', 'src', 20],
+    ['Classification', 'cls', 13], ['Current Status', 'stage', 14], ['Times Followed Up', 'n', 11],
+    ['Last Follow-up Date', 'last', 14], ['Last Follow-up Remark', 'rem', 34], ['Next Follow-up Date', 'nxt', 14],
+    ['Flag', 'flag', 26], ['Data As Of', 'asOf', 12],
+  ];
+  const DATE_KEYS = ['created', 'last', 'nxt', 'asOf'];
+
+  function notes(res) {
+    const asOfs = res.files.map((f) => fmtDay(f.asOf));
+    const n = [
+      'Times Followed Up = number of dated follow-up entries recorded under the enquiry in the HMSI report.',
+      'Last follow-up date/remark = the most recent follow-up entry; Next follow-up date is the one set on that entry.',
+      'Flag: "No follow-up recorded", "No next follow-up date" or "Next follow-up date passed" (next date earlier than the Data As Of date).',
+      'Data As Of per report file: ' + res.files.map((f) => f.name + ' = ' + fmtDay(f.asOf)).join('; ') + '. Follow-ups done after a report was pulled are not reflected.',
+    ];
+    if (res.anyNoMobile) n.push('At least one report has no mobile number column, so Mobile No. is blank for those enquiries.');
+    n.push('Booking-stage enquiries (' + res.booking + ') and Lost enquiries (' + res.lost + ') are not included in the open list.');
+    return n;
+  }
+
+  // Writes the workbook with ExcelJS; returns the workbook.
+  function toWorkbook(ExcelJS, res) {
+    const wb = new ExcelJS.Workbook();
+    const FONT = 'Arial';
+    const thin = { style: 'thin', color: { argb: 'FFDDDDDD' } };
+    const S = wb.addWorksheet('Summary');
+
+    const fill = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+    const modelSheet = (ws, res) => {
+      const ex = res.execs, M = res.models, n = M.length, tr = n + 2;
+      const L = (i) => String.fromCharCode(65 + i); // column letter (fewer than 26 columns)
+      const heads = ['Model', 'Total Enquiries', 'Share', 'Open', 'Booking', 'Invoiced', 'Lost', 'Booked or Invoiced %'].concat(ex);
+      heads.forEach((h, j) => {
+        const c = ws.getCell(1, j + 1);
+        c.value = h; c.font = { name: FONT, bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = fill('FF1F4E78');
+        c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        ws.getColumn(j + 1).width = j === 0 ? 26 : j >= 8 ? 20 : 13;
+      });
+      ws.getRow(1).height = 32;
+      const tot = M.reduce((s, m) => s + m.total, 0);
+      M.forEach((m, i) => {
+        const r = i + 2;
+        ws.getCell(r, 1).value = m.model;
+        ws.getCell(r, 2).value = m.total;
+        ws.getCell(r, 3).value = { formula: `B${r}/B$${tr}`, result: tot ? m.total / tot : 0 };
+        [m.open, m.booking, m.invoiced, m.lost].forEach((v, k) => { ws.getCell(r, 4 + k).value = v; });
+        ws.getCell(r, 8).value = { formula: `IFERROR((E${r}+F${r})/B${r},0)`, result: m.total ? (m.booking + m.invoiced) / m.total : 0 };
+        ex.forEach((e, k) => { ws.getCell(r, 9 + k).value = m.byExec[e]; });
+      });
+      const sum = (f) => M.reduce((s, m) => s + f(m), 0);
+      ws.getCell(tr, 1).value = 'Total';
+      ws.getCell(tr, 2).value = { formula: `SUM(B2:B${n + 1})`, result: tot };
+      ws.getCell(tr, 3).value = { formula: `SUM(C2:C${n + 1})`, result: tot ? 1 : 0 };
+      [['open', 'D'], ['booking', 'E'], ['invoiced', 'F'], ['lost', 'G']].forEach(([k, l], i) => {
+        ws.getCell(tr, 4 + i).value = { formula: `SUM(${l}2:${l}${n + 1})`, result: sum((m) => m[k]) };
+      });
+      const bi = sum((m) => m.booking + m.invoiced);
+      ws.getCell(tr, 8).value = { formula: `IFERROR((E${tr}+F${tr})/B${tr},0)`, result: tot ? bi / tot : 0 };
+      ex.forEach((e, k) => { ws.getCell(tr, 9 + k).value = { formula: `SUM(${L(8 + k)}2:${L(8 + k)}${n + 1})`, result: sum((m) => m.byExec[e]) }; });
+      for (let r = 2; r <= tr; r++) for (let c = 1; c <= heads.length; c++) {
+        const x = ws.getCell(r, c);
+        x.font = { name: FONT, size: 10, bold: r === tr }; x.border = { bottom: thin };
+        if (c === 3 || c === 8) x.numFmt = '0.0%';
+        if (c > 1) x.alignment = { horizontal: 'center' };
+        if (r === tr) x.fill = fill('FFDDEBF7');
+      }
+      const nr = ws.getCell(tr + 2, 1);
+      nr.value = 'Counts are by Model Name as written in the HMSI report, all enquiry stages included. Open = Enquiry or Quotation. Booked or Invoiced % = (Booking + Invoiced) / Total. Executive columns count all stages.';
+      nr.font = { name: FONT, italic: true, size: 9 };
+      ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 1 }];
+    };
+    const dataSheet = (ws, rows) => {
+      COLS.forEach(([h, k, w], j) => {
+        const c = ws.getCell(1, j + 1);
+        c.value = h;
+        c.font = { name: FONT, bold: true, color: { argb: 'FFFFFFFF' } };
+        c.fill = fill('FF1F4E78');
+        c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        ws.getColumn(j + 1).width = w;
+      });
+      ws.getRow(1).height = 32;
+      rows.forEach((r, i) => {
+        COLS.forEach(([h, k], j) => {
+          let v = k === null ? i + 1 : r[k];
+          if (DATE_KEYS.includes(k)) v = v === null || v === undefined ? null : new Date(v);
+          else if (v === '' || v === undefined) v = null;
+          const c = ws.getCell(i + 2, j + 1);
+          c.value = v;
+          c.font = { name: FONT, size: 10 };
+          c.border = { bottom: thin };
+          if (DATE_KEYS.includes(k)) { c.numFmt = 'DD-MMM-YYYY'; c.alignment = { horizontal: 'center' }; }
+          if (['n', 'cls', 'stage'].includes(k)) c.alignment = { horizontal: 'center' };
+          if (k === 'flag' && v) c.font = { name: FONT, size: 10, color: { argb: 'FFC00000' } };
+        });
+      });
+      ws.views = [{ state: 'frozen', xSplit: 3, ySplit: 1 }];
+      ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(rows.length + 1, 2), column: COLS.length } };
+    };
+
+    modelSheet(wb.addWorksheet('Model Wise'), res);
+    for (const p of res.perExec) dataSheet(wb.addWorksheet(p.sheet), p.open);
+    dataSheet(wb.addWorksheet('Invoiced'), res.invoiced);
+
+    S.getCell('A1').value = 'Open Enquiries and Invoiced Customers – Summary';
+    S.getCell('A1').font = { name: FONT, bold: true, size: 14 };
+    S.getCell('A2').value = 'Reports: ' + res.files.map((f) => f.name.replace(/\.[^.]+$/, '') + ' (as of ' + fmtDay(f.asOf) + ')').join(' + ') + '. Open = Enquiry or Quotation stage.';
+    S.getCell('A2').font = { name: FONT, italic: true, size: 9 };
+    ['Executive', 'Open Enquiries', 'Avg Times Followed Up', 'No Follow-up Recorded', 'Next Follow-up Date Passed', 'Invoiced'].forEach((h, j) => {
+      const c = S.getCell(4, j + 1);
+      c.value = h; c.font = { name: FONT, bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = fill('FF1F4E78');
+      c.alignment = { horizontal: 'center', wrapText: true };
+    });
+    S.getRow(4).height = 32;
+    const r0 = 5;
+    res.stats.forEach((s, i) => {
+      const r = r0 + i, q = "'" + s.sheet + "'";
+      S.getCell(r, 1).value = s.exec;
+      S.getCell(r, 2).value = { formula: `COUNTA(${q}!C:C)-1`, result: s.open };
+      S.getCell(r, 3).value = { formula: `IFERROR(AVERAGE(${q}!K:K),0)`, result: s.avg };
+      S.getCell(r, 3).numFmt = '0.0';
+      S.getCell(r, 4).value = { formula: `COUNTIF(${q}!K:K,0)`, result: s.none };
+      S.getCell(r, 5).value = { formula: `COUNTIF(${q}!O:O,"Next follow-up date passed")`, result: s.passed };
+      S.getCell(r, 6).value = { formula: `COUNTIF(Invoiced!B:B,A${r})`, result: s.invoiced };
+    });
+    const rl = r0 + res.stats.length - 1, rt = rl + 1, t = res.totals;
+    S.getCell(rt, 1).value = 'Total';
+    S.getCell(rt, 2).value = { formula: `SUM(B${r0}:B${rl})`, result: t.open };
+    S.getCell(rt, 3).value = { formula: `IFERROR(SUMPRODUCT(B${r0}:B${rl},C${r0}:C${rl})/B${rt},0)`, result: t.avg };
+    S.getCell(rt, 3).numFmt = '0.0';
+    S.getCell(rt, 4).value = { formula: `SUM(D${r0}:D${rl})`, result: t.none };
+    S.getCell(rt, 5).value = { formula: `SUM(E${r0}:E${rl})`, result: t.passed };
+    S.getCell(rt, 6).value = { formula: `SUM(F${r0}:F${rl})`, result: t.invoiced };
+    for (let r = r0; r <= rt; r++) for (let c = 1; c <= 6; c++) {
+      const x = S.getCell(r, c);
+      x.font = { name: FONT, bold: r === rt }; x.border = { bottom: thin };
+      if (c > 1) x.alignment = { horizontal: 'center' };
+      if (r === rt) x.fill = fill('FFDDEBF7');
+    }
+    [26, 16, 18, 18, 20, 12].forEach((w, i) => { S.getColumn(i + 1).width = w; });
+    S.getCell(rt + 2, 1).value = 'Notes';
+    S.getCell(rt + 2, 1).font = { name: FONT, bold: true };
+    notes(res).forEach((l, i) => { const c = S.getCell(rt + 3 + i, 1); c.value = l; c.font = { name: FONT, size: 10 }; });
+    return wb;
+  }
+
+  return { parseReport, build, toWorkbook, fmtDay, toDay, COLS, DATE_KEYS, notes };
+})();
+
+</script>
+<script>
+(function(){
+  const $=(id)=>document.getElementById(id);
+  const state={files:[],res:null,tab:0};
+  let seq=0;
+  const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const dayToInput=(ms)=>new Date(ms).toISOString().slice(0,10);
+  const inputToDay=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);return m?Date.UTC(+m[1],+m[2]-1,+m[3]):null};
+
+  function guessAsOf(file){
+    let m=file.name.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if(m) return Date.UTC(+m[1],+m[2]-1,+m[3]);
+    m=file.name.match(/(\d{2})\.(\d{2})\.(\d{2,4})/);
+    if(m) return Date.UTC(+m[3]<100?2000+ +m[3]:+m[3],+m[2]-1,+m[1]);
+    const d=new Date(file.lastModified||Date.now());
+    return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());
+  }
+
+  async function readAoa(file){
+    const isText=/\.(csv|tsv|txt)$/i.test(file.name);
+    let wb;
+    if(isText){
+      const text=await file.text();
+      const first=text.split(/\r?\n/,1)[0]||'';
+      const FS=(first.match(/\t/g)||[]).length>=(first.match(/,/g)||[]).length?'\t':',';
+      wb=XLSX.read(text,{type:'string',raw:true,FS});
+    }else{
+      wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
+    }
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:null});
+  }
+
+  async function addFiles(list){
+    for(const file of Array.from(list)){
+      const f={id:++seq,name:file.name,asOf:guessAsOf(file),records:null,hasMobile:false,error:''};
+      state.files.push(f);
+      try{
+        const aoa=await readAoa(file);
+        const p=Core.parseReport(aoa,f.asOf);
+        f.records=p.records;f.hasMobile=p.hasMobile;
+        if(!p.records.length) throw new Error('No enquiries were found in this file.');
+      }catch(e){f.error=e&&e.message?e.message:'This file could not be read.';}
+      render();
+    }
+  }
+
+  function reparse(f){ if(f.records) f.records.forEach((r)=>{r.asOf=f.asOf;}); }
+
+  function renderFiles(){
+    const box=$('files');
+    box.innerHTML='';
+    state.files.forEach((f)=>{
+      const row=document.createElement('div');row.className='file'+(f.error?' err':'');
+      row.innerHTML='<div class="nm">'+esc(f.name)+'</div>'+
+        (f.error?'<div class="meta">'+esc(f.error)+'</div>':
+          '<div class="meta">'+f.records.length+' enquiries</div><label>Data as of <input type="date" value="'+dayToInput(f.asOf)+'" data-id="'+f.id+'" aria-label="Data as of date for '+esc(f.name)+'"></label>')+
+        '<button class="x" type="button" data-rm="'+f.id+'" aria-label="Remove '+esc(f.name)+'">Remove</button>';
+      box.appendChild(row);
+    });
+  }
+
+  function buildResult(){
+    const ok=state.files.filter((f)=>f.records&&!f.error);
+    ok.forEach(reparse);
+    state.res=ok.length?Core.build(ok):null;
+  }
+
+  const fmt1=(n)=>n.toFixed(1);
+  function renderSummary(){
+    const r=state.res, t=r.totals;
+    let h='<thead><tr><th style="text-align:left">Executive</th><th>Open enquiries</th><th>Avg times followed up</th><th>No follow-up recorded</th><th>Next follow-up date passed</th><th>Invoiced</th></tr></thead><tbody>';
+    r.stats.forEach((s)=>{h+='<tr><td>'+esc(s.exec)+'</td><td class="n">'+s.open+'</td><td class="n">'+fmt1(s.avg)+'</td><td class="n">'+s.none+'</td><td class="n">'+s.passed+'</td><td class="n">'+s.invoiced+'</td></tr>';});
+    h+='<tr class="tot"><td>Total</td><td class="n">'+t.open+'</td><td class="n">'+fmt1(t.avg)+'</td><td class="n">'+t.none+'</td><td class="n">'+t.passed+'</td><td class="n">'+t.invoiced+'</td></tr></tbody>';
+    $('sum').innerHTML=h;
+    $('sumnote').textContent='Open means Enquiry or Quotation stage. '+r.booking+' booking and '+r.lost+' lost enquiries are left out. '+r.all.length+' enquiries in total from '+r.files.length+' report'+(r.files.length>1?'s':'')+'.';
+  }
+
+  function renderModels(){
+    const r=state.res, M=r.models, tot=M.reduce((s,m)=>s+m.total,0), max=Math.max(1,...M.map((m)=>m.total));
+    let h='<thead><tr><th style="text-align:left">Model</th><th>Enquiries</th><th>Share</th><th>Open</th><th>Booking</th><th>Invoiced</th><th>Lost</th><th>Booked or invoiced</th>'+r.execs.map((e)=>'<th>'+esc(e)+'</th>').join('')+'</tr></thead><tbody>';
+    M.forEach((m)=>{
+      const bi=m.booking+m.invoiced;
+      h+='<tr><td class="mod">'+esc(m.model)+'<i class="bar" style="width:'+Math.round(m.total/max*100)+'%"></i></td><td class="n">'+m.total+'</td><td class="n">'+(m.total/tot*100).toFixed(1)+'%</td><td class="n">'+m.open+'</td><td class="n">'+m.booking+'</td><td class="n">'+m.invoiced+'</td><td class="n">'+m.lost+'</td><td class="n">'+bi+' ('+(bi/m.total*100).toFixed(1)+'%)</td>'+r.execs.map((e)=>'<td class="n">'+m.byExec[e]+'</td>').join('')+'</tr>';
+    });
+    const sm=(f)=>M.reduce((s,m)=>s+f(m),0), bt=sm((m)=>m.booking+m.invoiced);
+    h+='<tr class="tot"><td>Total</td><td class="n">'+tot+'</td><td class="n">100.0%</td><td class="n">'+sm((m)=>m.open)+'</td><td class="n">'+sm((m)=>m.booking)+'</td><td class="n">'+sm((m)=>m.invoiced)+'</td><td class="n">'+sm((m)=>m.lost)+'</td><td class="n">'+bt+' ('+(bt/tot*100).toFixed(1)+'%)</td>'+r.execs.map((e)=>'<td class="n">'+sm((m)=>m.byExec[e])+'</td>').join('')+'</tr></tbody>';
+    $('mod').innerHTML=h;
+  }
+
+  function tabsList(){
+    const r=state.res;
+    return r.perExec.map((p)=>({label:p.sheet.replace(/^Open - /,''),rows:p.open,inv:false})).concat([{label:'Invoiced',rows:r.invoiced,inv:true}]);
+  }
+  function renderTabs(){
+    const list=tabsList();
+    if(state.tab>=list.length) state.tab=0;
+    $('tabs').innerHTML=list.map((t,i)=>'<button class="tab" role="tab" type="button" data-tab="'+i+'" aria-selected="'+(i===state.tab)+'">'+(t.inv?'':'Open: ')+esc(t.label)+'<small>'+t.rows.length+'</small></button>').join('');
+  }
+  function renderPreview(){
+    const t=tabsList()[state.tab];
+    const flt=$('flt').value;
+    $('tools').hidden=t.inv;
+    const rows=(!t.inv&&flt)?t.rows.filter((r)=>r.flag===flt):t.rows;
+    const cols=Core.COLS.filter(([h,k])=>k!==null&&k!=='asOf'&&(t.inv||k!=='exec')&&!(k==='flag'&&t.inv));
+    let h='<thead><tr>'+cols.map(([n])=>'<th>'+esc(n)+'</th>').join('')+'</tr></thead><tbody>';
+    rows.forEach((r)=>{
+      h+='<tr>'+cols.map(([n,k])=>{
+        let v=r[k];
+        if(Core.DATE_KEYS.includes(k)) return '<td class="c">'+esc(Core.fmtDay(v))+'</td>';
+        if(k==='n') return '<td class="n">'+v+'</td>';
+        if(k==='enq') return '<td class="mono">'+esc(v)+'</td>';
+        if(k==='flag') return '<td>'+(v?'<span class="pill">'+esc(v)+'</span>':'')+'</td>';
+        if(k==='cls'||k==='stage') return '<td class="c">'+esc(v)+'</td>';
+        if(k==='model'||k==='rem') return '<td class="wrap">'+esc(v)+'</td>';
+        return '<td>'+esc(v)+'</td>';
+      }).join('')+'</tr>';
+    });
+    if(!rows.length) h+='<tr><td colspan="'+cols.length+'" style="text-align:center;color:var(--muted)">No enquiries to show.</td></tr>';
+    $('prev').innerHTML=h+'</tbody>';
+    $('cnt').textContent=rows.length+' of '+t.rows.length+' shown';
+  }
+
+  function render(){
+    renderFiles();
+    buildResult();
+    const has=!!state.res;
+    $('results').hidden=!has;
+    $('empty').hidden=has;
+    if(has){renderSummary();renderModels();renderTabs();renderPreview();}
+  }
+
+  async function download(){
+    if(!state.res) return;
+    const st=$('status');
+    try{
+      st.textContent='Preparing file\u2026';
+      const wb=Core.toWorkbook(ExcelJS,state.res);
+      const buf=await wb.xlsx.writeBuffer();
+      const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;a.download='Open_Enquiries_and_Invoiced.xlsx';
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),10000);
+      st.textContent='Downloaded.';
+    }catch(e){
+      st.textContent='The file could not be created.';
+    }
+  }
+
+  $('pick').addEventListener('click',()=>$('file').click());
+  $('file').addEventListener('change',(e)=>{addFiles(e.target.files);e.target.value='';});
+  const drop=$('drop');
+  ['dragenter','dragover'].forEach((ev)=>drop.addEventListener(ev,(e)=>{e.preventDefault();drop.classList.add('over');}));
+  ['dragleave','drop'].forEach((ev)=>drop.addEventListener(ev,(e)=>{e.preventDefault();drop.classList.remove('over');}));
+  drop.addEventListener('drop',(e)=>{if(e.dataTransfer&&e.dataTransfer.files.length) addFiles(e.dataTransfer.files);});
+  $('files').addEventListener('click',(e)=>{
+    const id=e.target.getAttribute&&e.target.getAttribute('data-rm');
+    if(id){state.files=state.files.filter((f)=>String(f.id)!==id);render();}
+  });
+  $('files').addEventListener('change',(e)=>{
+    const id=e.target.getAttribute&&e.target.getAttribute('data-id');
+    if(!id) return;
+    const f=state.files.find((x)=>String(x.id)===id);
+    const d=inputToDay(e.target.value);
+    if(f&&d!==null){f.asOf=d;render();}
+  });
+  $('tabs').addEventListener('click',(e)=>{
+    const b=e.target.closest&&e.target.closest('[data-tab]');
+    if(b){state.tab=+b.getAttribute('data-tab');renderTabs();renderPreview();}
+  });
+  $('flt').addEventListener('change',renderPreview);
+  $('dl').addEventListener('click',download);
+
+  window.__app={addFiles,state};
+})();
+</script>
+
+</body>
+</html>
